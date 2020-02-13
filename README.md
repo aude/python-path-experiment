@@ -15,15 +15,18 @@ TL;DR
 
 	$ sh experiment.sh
 	+ python cli/run.py
+	sys.path: ['/home/.../python-path-experiment/cli', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
 	Traceback (most recent call last):
-	  File "cli/run.py", line 1, in <module>
+	  File "cli/run.py", line 4, in <module>
 	    from utils.logging import info
-	ModuleNotFoundError: No module named 'utils.logging'
+	ModuleNotFoundError: No module named 'utils'
 	++ pwd
 	+ PYTHONPATH=/home/.../python-path-experiment
 	+ python cli/run.py
+	sys.path: ['/home/.../python-path-experiment/cli', '/home/.../python-path-experiment', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
 	logging: test message
 	+ python -m cli.run
+	sys.path: ['/home/.../python-path-experiment', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
 	logging: test message
 
 python package/script.py
@@ -34,17 +37,23 @@ In this repo, there are two packages:
 - `cli`
 - `utils`
 
-`cli/run.py` imports a function from `utils/logging.py` and uses it:
+> Note that there are two _packages_, not _modules_. That makes it a **monorepo**.
+
+`cli/run.py` first prints `sys.path`, then imports a function from `utils/logging.py`
+and uses it:
+
+	import sys
+	print("sys.path:", sys.path)
 
 	from utils.logging import info
-
 	info("hello world")
 
 Let's try to run it:
 
 	$ python cli/run.py
+	sys.path: ['/home/.../python-path-experiment/cli', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
 	Traceback (most recent call last):
-	  File "cli/run.py", line 1, in <module>
+	  File "cli/run.py", line 4, in <module>
 	    from utils.logging import info
 	ModuleNotFoundError: No module named 'utils'
 
@@ -54,8 +63,9 @@ Let's try from it's directory:
 
 	$ cd cli
 	$ python run.py
+	sys.path: ['/home/.../python-path-experiment/cli', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
 	Traceback (most recent call last):
-	  File "run.py", line 1, in <module>
+	  File "cli/run.py", line 4, in <module>
 	    from utils.logging import info
 	ModuleNotFoundError: No module named 'utils'
 
@@ -70,11 +80,9 @@ In order for `from utils.logging import info` to work,
 
 Let's take a look at Python's import path:
 
-	$ echo 'import sys
-
-	print(sys.path)' > cli/run.py
 	$ python cli/run.py
-	['/home/.../python-path-experiment/cli', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
+	sys.path: ['/home/.../python-path-experiment/cli', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
+	...
 
 Aha!
 
@@ -93,7 +101,7 @@ Let's verify:
 	$ python cli/tools/run.py
 	['/home/.../python-path-experiment/cli/tools', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
 
-Yep. The script's directory is added to the import path, **not** the current directory.
+Yep! The script's directory is added to the import path, **not** the current directory.
 
 Let's clean up:
 
@@ -114,44 +122,49 @@ One way is to set the environment variable `PYTHONPATH`.
 Let's try:
 
 	$ PYTHONPATH=$(pwd) python cli/run.py
+	sys.path: ['/home/.../python-path-experiment/cli', '/home/.../python-path-experiment', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
 	logging: test message
 
-Oh! So this works. Let's see what the import path looks like:
+Oh! So this works.
 
-	$ echo 'import sys
+Looking at the import path, we can see that the current directory is there.
+That's why it works.
 
-	print(sys.path)' > cli/run.py
-	$ PYTHONPATH=$(pwd) python cli/run.py
-	['/home/.../python-path-experiment/cli', '/home/.../python-path-experiment', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
+Though, that first path there looks a bit awkward. Is it correct that `.../cli` is
+there?
 
-Yep, the current directory is there. That's why it works.
-
-Though, that first path there looks a bit awkward.
-It doesn't really feel correct that `.../cli` is there for no reason, does it?
-
-Let's clean up:
-
-	$ git clean -df
-	$ git checkout .
-
-PYTHONPATH's downfall
----------------------
+PYTHONPATH's side effect
+------------------------
 
 Actually, what if there is a `utils` package inside `cli`?
 Will it override the original one?
 
 	$ PYTHONPATH=$(pwd) python cli/run.py
+	sys.path: ['/home/.../python-path-experiment/cli', '/home/.../python-path-experiment', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
 	logging: test message
 	$ mkdir cli/utils
 	$ touch cli/utils/__init__.py
 	$ echo 'def info(msg):
-	    print("muhaha")' > cli/utils/logging.py
+	    print("override message")' > cli/utils/logging.py
 	$ PYTHONPATH=$(pwd) python cli/run.py
-	muhaha
+	override message
 
-Yeah, nope. Don't want that.
+Yes, it does override! Do we want this?
 
-Using `PYTHONPATH` does not do what we intended.
+The answer depends on what you are building:
+
+If you are building a **monorepo**, the answer is **yes**.
+The reason is that you're bundling multiple _packages_, isolated code bases, in one
+repository. In order for one package to have any clue where to look for other packages,
+you have to make them all available in `sys.path`. Setting `PYTHONPATH` is one way to
+do that.
+
+If you are building a **monolith**, not a monorepo, the answer is **no**.
+If you're building a monolith, keep everything in one package. Then you don't need
+to look in `sys.path`, because you can use [relative imports](https://docs.python.org/3/reference/import.html#package-relative-imports).
+
+If you are building a **multirepo**, you don't need any of this.
+You can use `pip install` or git submodules or something, you probably know already.
 
 Time to clean:
 
@@ -161,7 +174,8 @@ Time to clean:
 python -m
 ---------
 
-So what _can_ we do? What is best practice for spawning a script inside a package?
+So, this whole `PYTHONPATH` feels a bit complicated. Can we make it without it?
+What is best practice for running a script inside a package?
 
 Let's [consult](https://stackoverflow.com/a/47030746)
 [the](https://stackoverflow.com/a/6466139)
@@ -170,54 +184,77 @@ Let's [consult](https://stackoverflow.com/a/47030746)
 Several resources are pointing to `sys.path` hacks, but are also mentioning `python -m`.
 Could it be more correct than directly setting the Python import path?
 
-Guido [says yes](https://mail.python.org/pipermail/python-3000/2007-April/006793.html):
+Let's try it:
+
+	$ python -m cli.run
+	sys.path: ['/home/.../python-path-experiment', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
+	logging: test message
+
+It works!
+
+The import path, though, might not be correct.
+
+For a **monorepo**, it is not correct. Every package's directory should be in
+`sys.path`, so `.../cli` should have been there in this case.
+
+For a **multirepo**, it is not correct either. The package's directory should be in
+`sys.path`, so `.../cli` should have been there.
+
+It seems most suitable to running scripts from installed packages. This is probably
+the reason we are seeing commands like these recommended:
+
+- `python -m venv .venv`
+- `python -m flask run`
+- `python -m unittest discover`
+
+It could be because it can run a script from `sys.path` without changing `sys.path`.
+
+Guido says
+----------
+
+It's probably worth it to keep in mind Guido's
+[opinion](https://mail.python.org/pipermail/python-3000/2007-April/006793.html) on
+what we are trying to here:
 
 > ... running scripts that happen to be living inside a module's directory, which I've
 > always seen as an antipattern. To make me change my mind you'd have to convince me
 > that it isn't. - Guido van Rossum
 
-Let's try it:
+Installing packages
+-------------------
 
-	$ python -m cli.run
-	logging: test message
+In the end, the most correct way to distribute packages is to install them, probably
+inside a virtual environment.
 
-It works!
+This experiment does not look into that.
 
-Let's check Python's import path this time:
-
-	$ echo 'import sys
-
-	print(sys.path)' > cli/run.py
-	$ python cli.run
-	['/home/.../python-path-experiment', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
-
-Kapow! It's correct.
-
-But blah, `python -m cli.run` is annoying to write :/
-It doesn't even have reliable tab completion. Meh.
-
-But as far as this experiment goes, it emerges as a correct way to run the script
-`cli/run.py`.
-
-Clean up:
-
-	$ git clean -df
-	$ git checkout .
+If you want to look into it, here is some information:
+https://stackoverflow.com/a/50193944
 
 Conclusion
 ----------
 
+For **monorepo**:
+
 | Method                                    | Works well |
 | ----------------------------------------- | ---------- |
 | `python package/script.py`                | ✖          |
-| `PYTHONPATH=... python package/script.py` | ✖          |
-| `python -m package.script`                | ✔          |
+| `PYTHONPATH=... python package/script.py` | ✔          |
+| `python -m package.script`                | ✖          |
+| Installing packages                       | ✔          |
 
-`python -m` emerged as the solution that worked best. It does have an annoying lack of
-tab completion, and that makes it less attractive to use for people who appreciate tab
-completion. But that's about user experience, not functionality.
+For **multirepo**:
 
-And hey! Python is free software! Go make the tab completion if you want it to happen! :D
+| Method                                    | Works well |
+| ----------------------------------------- | ---------- |
+| `python package/script.py`                | ✔          |
+| `PYTHONPATH=... python package/script.py` | ✔          |
+| `python -m package.script`                | ✖          |
+| Installing packages                       | ✔          |
+
+`PYTHONPATH` emerged as the easy solution that worked best for monorepos, while
+`python script.py` was the easy solution that worked best for multirepos.
+Installing packages worked best, but was less easy.
 
 If you know something not covered, feel free to make a pull request!
 
@@ -230,20 +267,28 @@ What happens if we remove `__init__.py` files, to create
 	$ rm */__init__.py
 	$ sh experiment.sh
 	+ python cli/run.py
+	sys.path: ['/home/.../python-path-experiment/cli', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
 	Traceback (most recent call last):
-	  File "cli/run.py", line 1, in <module>
+	  File "cli/run.py", line 4, in <module>
 	    from utils.logging import info
-	ModuleNotFoundError: No module named 'utils.logging'
+	ModuleNotFoundError: No module named 'utils'
 	++ pwd
 	+ PYTHONPATH=/home/.../python-path-experiment
 	+ python cli/run.py
+	sys.path: ['/home/.../python-path-experiment/cli', '/home/.../python-path-experiment', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
 	logging: test message
 	+ python -m cli.run
+	sys.path: ['/home/.../python-path-experiment', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
 	logging: test message
 
 So the behavior is the same. Hmm.
 
 Will have to dig more into Python packages without `__init__.py` another day.
+
+Clean:
+
+	$ git clean -df
+	$ git checkout .
 
 More information
 ----------------
