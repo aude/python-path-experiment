@@ -15,18 +15,18 @@ TL;DR
 
 	$ sh experiment.sh
 	+ python cli/run.py
-	sys.path: ['/home/.../python-path-experiment/cli', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
+	sys.path: ['.../python-path-experiment/cli', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
 	Traceback (most recent call last):
 	  File "cli/run.py", line 4, in <module>
 	    from utils.logging import info
 	ModuleNotFoundError: No module named 'utils'
 	++ pwd
-	+ PYTHONPATH=/home/.../python-path-experiment
+	+ PYTHONPATH=.../python-path-experiment
 	+ python cli/run.py
-	sys.path: ['/home/.../python-path-experiment/cli', '/home/.../python-path-experiment', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
+	sys.path: ['.../python-path-experiment/cli', '.../python-path-experiment', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
 	logging: test message
 	+ python -m cli.run
-	sys.path: ['/home/.../python-path-experiment', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
+	sys.path: ['.../python-path-experiment', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
 	logging: test message
 
 python package/script.py
@@ -37,21 +37,23 @@ In this repo, there are two packages:
 - `cli`
 - `utils`
 
-> Note that there are two _packages_, not _modules_. That makes it a **monorepo**.
+> Note that there are two _packages_, not two _modules_. That makes this a **monorepo**.
 
 `cli/run.py` first prints `sys.path`, then imports a function from `utils/logging.py`
 and uses it:
 
-	import sys
-	print("sys.path:", sys.path)
+```python
+import sys
+print("sys.path:", sys.path)
 
-	from utils.logging import info
-	info("hello world")
+from utils.logging import info
+info("hello world")
+```
 
 Let's try to run it:
 
 	$ python cli/run.py
-	sys.path: ['/home/.../python-path-experiment/cli', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
+	sys.path: ['.../python-path-experiment/cli', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
 	Traceback (most recent call last):
 	  File "cli/run.py", line 4, in <module>
 	    from utils.logging import info
@@ -63,7 +65,7 @@ Let's try from it's directory:
 
 	$ cd cli
 	$ python run.py
-	sys.path: ['/home/.../python-path-experiment/cli', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
+	sys.path: ['.../python-path-experiment/cli', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
 	Traceback (most recent call last):
 	  File "cli/run.py", line 4, in <module>
 	    from utils.logging import info
@@ -76,12 +78,12 @@ Nope. Doesn't work either.
 Okay, we can try to get to the bottom of why it doesn't work.
 
 In order for `from utils.logging import info` to work,
-**the utils package must be findable by Python**.
+**the `utils` package must be findable by Python**.
 
 Let's take a look at Python's import path:
 
 	$ python cli/run.py
-	sys.path: ['/home/.../python-path-experiment/cli', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
+	sys.path: ['.../python-path-experiment/cli', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
 	...
 
 Aha!
@@ -99,7 +101,7 @@ Let's verify:
 
 	print(sys.path)' > cli/tools/run.py
 	$ python cli/tools/run.py
-	['/home/.../python-path-experiment/cli/tools', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
+	['.../python-path-experiment/cli/tools', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
 
 Yep! The script's directory is added to the import path, **not** the current directory.
 
@@ -122,7 +124,7 @@ One way is to set the environment variable `PYTHONPATH`.
 Let's try:
 
 	$ PYTHONPATH=$(pwd) python cli/run.py
-	sys.path: ['/home/.../python-path-experiment/cli', '/home/.../python-path-experiment', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
+	sys.path: ['.../python-path-experiment/cli', '.../python-path-experiment', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
 	logging: test message
 
 Oh! So this works.
@@ -140,7 +142,7 @@ Actually, what if there is a `utils` package inside `cli`?
 Will it override the original one?
 
 	$ PYTHONPATH=$(pwd) python cli/run.py
-	sys.path: ['/home/.../python-path-experiment/cli', '/home/.../python-path-experiment', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
+	sys.path: ['.../python-path-experiment/cli', '.../python-path-experiment', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
 	logging: test message
 	$ mkdir cli/utils
 	$ touch cli/utils/__init__.py
@@ -187,27 +189,28 @@ Could it be more correct than directly setting the Python import path?
 Let's try it:
 
 	$ python -m cli.run
-	sys.path: ['/home/.../python-path-experiment', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
+	sys.path: ['.../python-path-experiment', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
 	logging: test message
 
 It works!
 
 The import path, though, might not be correct.
 
-For a **monorepo**, it is not correct. Every package's directory should be in
+For a **monorepo**, it is **not correct**. Every package's directory should be in
 `sys.path`, so `.../cli` should have been there in this case.
 
-For a **multirepo**, it is not correct either. The package's directory should be in
+For a **multirepo**, it is **not correct** either. The package's directory should be in
 `sys.path`, so `.../cli` should have been there.
 
-It seems most suitable to running scripts from installed packages. This is probably
-the reason we are seeing commands like these recommended:
+`python -m` seems most suitable to running scripts from installed packages. This is
+probably the reason we are seeing commands like these recommended:
 
 - `python -m venv .venv`
 - `python -m flask run`
 - `python -m unittest discover`
 
-It could be because it can run a script from `sys.path` without changing `sys.path`.
+It could be because it can run a script from `sys.path` without adding the script's
+directory to `sys.path`.
 
 Guido says
 ----------
@@ -226,7 +229,8 @@ Installing packages
 In the end, the most correct way to distribute packages is to install them, probably
 inside a virtual environment.
 
-This experiment does not look into that.
+This experiment does not look into that, because it focuses on easy out-of-the-box
+solutions.
 
 If you want to look into it, here is some information:
 https://stackoverflow.com/a/50193944
@@ -253,10 +257,12 @@ For **multirepo**:
 | Installing packages                       | ✔          |
 
 `PYTHONPATH` emerged as the easy solution that worked best for monorepos, while
-`python script.py` was the easy solution that worked best for multirepos.
+`python package/script.py` was the easy solution that worked best for monoliths and
+multirepos.
+
 Installing packages worked best, but was less easy.
 
-If you know something not covered, feel free to make a pull request!
+If you know something not covered here, feel free to make a pull request!
 
 Bonus question
 --------------
@@ -267,18 +273,18 @@ What happens if we remove `__init__.py` files, to create
 	$ rm */__init__.py
 	$ sh experiment.sh
 	+ python cli/run.py
-	sys.path: ['/home/.../python-path-experiment/cli', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
+	sys.path: ['.../python-path-experiment/cli', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
 	Traceback (most recent call last):
 	  File "cli/run.py", line 4, in <module>
 	    from utils.logging import info
 	ModuleNotFoundError: No module named 'utils'
 	++ pwd
-	+ PYTHONPATH=/home/.../python-path-experiment
+	+ PYTHONPATH=.../python-path-experiment
 	+ python cli/run.py
-	sys.path: ['/home/.../python-path-experiment/cli', '/home/.../python-path-experiment', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
+	sys.path: ['.../python-path-experiment/cli', '.../python-path-experiment', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
 	logging: test message
 	+ python -m cli.run
-	sys.path: ['/home/.../python-path-experiment', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
+	sys.path: ['.../python-path-experiment', '/usr/lib/python38.zip', '/usr/lib/python3.8', '/usr/lib/python3.8/lib-dynload', '/usr/lib/python3.8/site-packages']
 	logging: test message
 
 So the behavior is the same. Hmm.
