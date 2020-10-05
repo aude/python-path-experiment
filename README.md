@@ -233,7 +233,9 @@ This experiment does not look into that, because it focuses on easy out-of-the-b
 solutions.
 
 If you want to look into it, here is some information:
-https://stackoverflow.com/a/50193944
+- https://stackoverflow.com/a/50193944
+- https://packaging.python.org/tutorials/packaging-projects/
+- Example: https://github.com/FrodeHus/instapull
 
 Conclusion
 ----------
